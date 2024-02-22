@@ -1,14 +1,14 @@
 @font-face {
     font-family: wood;
-    src: url(/resourse/WoodenLog.ttf);
+    src: url(/GUESS_THE_WORD\/resourse/WoodenLog.ttf);
 }
 @font-face {
     font-family: jumbbel;
-    src: url(/resourse/MIST.TTF);
+    src: url(/GUESS_THE_WORD\/resourse/MIST.TTF);
 }
 @font-face {
     font-family: contain;
-    src: url(/resourse/BubblegumSans-Regular.ttf);
+    src: url(/GUESS_THE_WORD\/resourse/BubblegumSans-Regular.ttf);
 }
 *{
     margin: 0;
@@ -16,7 +16,7 @@
     box-sizing: border-box;
 }
 body{
-    background-image: url(/resourse/background.gif);
+    background-image: url(/GUESS_THE_WORD\/resourse/background.gif);
     background-repeat: no-repeat;
     background-attachment: fixed;
     background-position: center;
@@ -51,7 +51,7 @@ section{
     margin-top: 50px;
 }
 #game-section{
-    background-image: url(/resourse/headingbackground.jpg);
+    background-image: url(/GUESS_THE_WORD\/resourse/headingbackground.jpg);
     background-repeat: no-repeat;
     background-attachment: fixed;
     background-position: center;
