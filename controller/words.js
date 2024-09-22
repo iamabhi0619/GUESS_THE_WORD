@@ -93,7 +93,7 @@ exports.checkWord = async (req, res) => {
     if (!word) {
       return res.status(404).json({ message: "Word not found" });
     }
-    if (word.word === guessWord) {
+    if (word.word.toLocaleLowerCase() === guessWord.toLocaleLowerCase()) {
       user = ScoreUpdate.scoreUpdate(user, word, true , time);
       await user.save();
       res.status(200).json({
