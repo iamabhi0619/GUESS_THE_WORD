@@ -1,81 +1,152 @@
-const words = require("../data.json");
-const wordService = require("../service/updation.js");
+const User = require("../models/user");
+const Word = require("../models/word");
+const ScoreUpdate = require("../service/update");
 
-exports.getWords = (req, res) => {
-  let data = req.body;
-  let newPaylod = wordService.getNewWord(data);
-  res.json({ progress: newPaylod });
+const getRandomWord = async (level, seenWords) => {
+  let words = await Word.find({ level }).exec();
+  if (seenWords.length > 0) {
+    words = words.filter((word) => !seenWords.includes(word.wordId));
+  }
+  if (words.length === 0) return null;
+  const randomIndex = Math.floor(Math.random() * words.length);
+  return words[randomIndex];
+};
+const scrambleWords = (word) => {
+  let arr = word.split("");
+  let n = arr.length;
+  for (let pass = 0; pass < n * 2; pass++) {
+    let i = Math.floor(Math.random() * n);
+    let j = Math.floor(Math.random() * n);
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr.join("");
 };
 
-exports.newUser = (req, res) => {
-  let name = req.body.name;
-  let progress = {
-    name,
-    points: 0,
-    score: 0,
-    hint: 0,
-    easy: 0,
-    cquestion: {},
-    easyQuestions: [],
-    medium: 0,
-    mediumQuestions: [],
-    hard: 0,
-    hardQuestions: [],
-  };
-  progress = wordService.getNewWord(progress);
-  res.json({ progress: progress });
+exports.getWords = async (req, res) => {
+  try {
+    const userId = req.params.userId;
+    const user = await User.findOne({ userId });
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    let level;
+    if (user.questionsSolved.easy <= 15) {
+      level = 1
+    } else if(user.questionsSolved.easy <= 25){
+      level = 2
+    } else if(user.questionsSolved.medium <= 7){
+      level = 3
+    }else if(user.questionsSolved.medium <= 20){
+      level = 4
+    }else if(user.questionsSolved.hard <= 10){
+      level = 5
+    }else if(user.questionsSolved.hard <=25){
+      level = 6
+    }
+    else {
+      // random between level 1-6
+      level = Math.floor(Math.random() * 6) + 1;
+    }
+    const gword = await getRandomWord(level, user.seenWords);
+    if (!gword) {
+      return res
+        .status(404)
+        .json({ message: "No new words found for this level" });
+    }
+    user.seenWords.push(gword.wordId);
+    const scrambledWord = scrambleWords(gword.word);
+    const word = {
+      wordId: gword.wordId,
+      scrambleWords: scrambledWord,
+      isSolved: false,
+      isSkipped: false,
+      isHint: false,
+      difficulty: gword.level,
+      try: 0,
+    };
+    user.current = word;
+    user.questions.unshift(word);
+    await user.save();
+    res.status(200).json(word);
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: "Error retrieving words", error: error.message });
+  }
 };
 
 exports.checkWord = async (req, res) => {
-  let data = req.body;
-  let updatedProgress = req.body.progress
   try {
-    const wordsarr = words[updatedProgress.cquestion.type];
-    const correct = wordsarr[updatedProgress.cquestion.w_id].toLowerCase();
-    const guess = data.guess.toLowerCase();
-    if (correct === guess) {
-      try {
-        // const response = await fetch(`https://api.api-ninjas.com/v1/dictionary?word=${correct}`, {
-        //   headers: { "X-Api-Key": "hcj3Nhv2ukkU8J2SxBIs2w" }
-        // });
-        
-        // if (!response.ok) {
-        //   throw new Error(`HTTP error! status: ${response.status}`);
-        // }
-        // const responseData = await response.json();
-        let meaning = 'No definition found';
-        // if (responseData && responseData.definition) {
-        //   const splitDefinition = responseData.definition.split("1. ");
-        //   if (splitDefinition[1]) {
-        //     meaning = splitDefinition[1].split(';')[0].trim();
-        //   }
-        // }
-        updatedProgress = { 
-          ...updatedProgress,
-          cquestion: { ...updatedProgress.cquestion, word: correct },
-          meaning: meaning,
-          solved: true
-        };
-        updatedProgress = wordService.updateScore(updatedProgress);
-        return res.json(updatedProgress);
-      } catch (error) {
-        console.error('Error fetching dictionary data:', error);
-        updatedProgress = {
-          ...updatedProgress,
-          error: 'Failed to fetch dictionary data'
-        };
-        return res.json(updatedProgress);
-      }
-    } else {
-      updatedProgress = {
-        ...updatedProgress,
-        try: (updatedProgress.try || 0) + 1
-      };
-      return res.json(updatedProgress);
+    const { guessWord, time } = req.body;
+    const userId = req.params.userId;
+    let user = await User.findOne({ userId });
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
     }
-
+    if (!user.current || !user.current.wordId) {
+      return res
+        .status(404)
+        .json({ message: "No current word found for user" });
+    }
+    const wordId = user.current.wordId;
+    const word = await Word.findOne({ wordId });
+    if (!word) {
+      return res.status(404).json({ message: "Word not found" });
+    }
+    if (word.word === guessWord) {
+      user = ScoreUpdate.scoreUpdate(user, word, true , time);
+      await user.save();
+      res.status(200).json({
+        status: true,
+        message: "Right guess! Well done!",
+        word: user.current,
+        score: {
+          score: user.score,
+          points: user.points,
+          currentRemainingHints: user.currentRemainingHints,
+          questionsSolved: user.questionsSolved,
+        },
+      });
+    } else {
+      user = ScoreUpdate.scoreUpdate(user, word, false);
+      await user.save();
+      res
+        .status(200)
+        .json({ status: false, message: "Wrong guess. Try again!" });
+    }
   } catch (error) {
-    console.error('Error checking word:', error);
-    return res.status(500).json({ error: 'Internal Server Error' });
+    res
+      .status(500)
+      .json({ message: "Error checking word", error: error.message });
   }
+};
+
+exports.getHint = async (req, res) => {
+  try {
+    const userId = req.params.userId;
+    let user = await User.findOne({ userId });
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    // if (user.currentRemainingHints == 0) {
+    //   const data = {
+    //     isHint: true,
+    //     hint: "No remaining hints available",
+    //   };
+    //   return res.status(200).json({ data });
+    // }
+    const wordId = user.current.wordId;
+    const word = await Word.findOne({ wordId });
+    user = ScoreUpdate.getHintUpdate(user, word);
+    console.log(user);
+    await user.save();
+    const score = {
+      score: user.score,
+      points: user.points,
+      questionsSolved: user.questionsSolved,
+      currentRemainingHints: user.currentRemainingHints,
+      hint: user.currentRemainingHints,
+    };
+    res.status(200).json({ word: user.current, score: score });
+  } catch (error) {}
 };
