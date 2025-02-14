@@ -1,11 +1,36 @@
+import axios from "axios";
 import React, { useEffect, useState } from "react";
-import StartButton from "./StartButton";
 
 function Start({ user, word, score }) {
-  const [name, setName] = useState("");
+
+
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+    gender: "",
+    remember: true,
+    serviceId: "S0001",
+    serviceName: "Guess The Word",
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  const [isSignup, setIsSignup] = useState(false);
+
+  const handleChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setFormData({
+      ...formData,
+      [name]: type === "checkbox" ? checked : value,
+    });
+  };
+
   useEffect(() => {
     localStorage.clear();
   }, []);
+
   const fetchScore = async (user) => {
     if (user && user.userId) {
       try {
@@ -17,10 +42,11 @@ function Start({ user, word, score }) {
       }
     }
   };
+
   const fetchWord = async (user) => {
     if (user && user.userId) {
       try {
-        const response = await fetch(`/api/word/${user.userId}`); 
+        const response = await fetch(`/api/word/${user.userId}`);
         const data = await response.json();
         word(data);
         localStorage.setItem("word", JSON.stringify(data));
@@ -29,48 +55,191 @@ function Start({ user, word, score }) {
       }
     }
   };
-  const handleClick = async () => {
-    if (!name.trim()) return;
+
+  const handleLogin = async () => {
     try {
-      const response = await fetch("/api/user", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ name }),
-      });
-      if (!response.ok) {
-        throw new Error("Network response was not ok");
+      const response = await axios.post("/api/user/login", formData)
+      if(!response.data.success){
+        setError(response.data.message)
+        return;
       }
-      const data = await response.json();
-      const dataTosave = {
-        userId: data.user.userId,
-        name: data.user.name,
-      };
-      fetchScore(dataTosave);
-      fetchWord(dataTosave);
-      localStorage.setItem("user", JSON.stringify(dataTosave));
-      user(dataTosave);
+      fetchScore(response.data.user);
+      fetchWord(response.data.user);
+      localStorage.setItem("user", JSON.stringify(response.data.user));
+      user(response.data.user);
     } catch (error) {
-      console.error("There was a problem with the fetch operation:", error);
-    } finally {
+      setError(error.response?.data?.message || "There was a problem with the request");
     }
   };
+
+  const handleSingup = async () => {
+    try {
+      const response = await axios.post("/api/user/signup", formData);
+      // if (response.status !== 200) throw new Error("Signup request failed");
+      if (response.data.success) {
+        setMessage(`Verification email sent to ${formData.email}`);
+        setIsSignup(false);
+      } else {
+        setMessage(response.data.message || "Signup failed.");
+      }
+    } catch (error) {
+      console.error("Signup Error:", error);
+      setMessage(
+        error.response?.data?.message ||
+          "An error occurred. Please try again later."
+      );
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    try {
+      setLoading(true);
+      if (isSignup) {
+        await handleSingup();
+      } else {
+        await handleLogin();
+      }
+    } catch (error) {
+      setError(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <div className="bg-white bg-opacity-70 flex-grow flex items-center justify-center rounded-3xl my-4 mx-4">
-      <div className="mx-2 bg-themColor-blue text-white rounded-3xl flex flex-col items-center py-5 shadow-2xl">
-        <input
-          type="text"
-          name="text"
-          value={name}
-          autoComplete="off"
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Enter your name"
-          className="bg-transparent lg:text-4xl md:text-3xl text-2xl outline-none border-none px-10 py-5 w-full font-normal tracking-wider text-white rounded-lg"
-        />
-        <div className="mt-4">
-          <StartButton onClick={handleClick} />
-        </div>
+    <div className="w-full flex items-center justify-center h-full font-normal text-themColor-blue">
+      <div className="bg-themColor-lightOrange border-[4px] border-themColor-blue rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:border-themColor-red max-w-lg w-full">
+        <form
+          onSubmit={handleSubmit}
+          className="flex flex-col items-center space-y-2 py-12 px-10"
+        >
+          <img src="/gtw_logo.png" alt="GTW Logo" className="h-24 w-24" />
+          <h1 className="text-3xl text-light">
+            {isSignup ? "Sign Up" : "Sign In"} to Guess The Word
+          </h1>
+          {error && (
+            <p className="text-red-500 font-medium text-sm text-center">
+              {error}
+            </p>
+          )}
+          {message && (
+            <p className="text-themColor-green font-semibold text-center text-lg">
+              {message}
+            </p>
+          )}
+          {isSignup && (
+            <input
+              className="w-full px-3 py-2 font-semibold tracking-wide text-pale bg-primary rounded-md border border-secondary focus:border-light hover:border-accent placeholder:text-themColor-yellow"
+              placeholder="Name"
+              type="text"
+              name="name"
+              value={formData.name}
+              onChange={handleChange}
+              required
+            />
+          )}
+
+          <input
+            className="w-full px-3 py-2 font-semibold tracking-wide text-pale bg-primary rounded-md border border-secondary focus:border-light hover:border-accent placeholder:text-themColor-yellow"
+            placeholder="Email"
+            type="email"
+            name="email"
+            value={formData.email}
+            onChange={handleChange}
+            required
+          />
+          <div className={`${isSignup && "grid grid-cols-2"} gap-2 w-full`}>
+            <input
+              className="w-full px-3 py-2 font-semibold tracking-wide text-pale bg-primary rounded-md border border-secondary focus:border-light hover:border-accent placeholder:text-themColor-yellow"
+              placeholder="Password"
+              type="password"
+              name="password"
+              value={formData.password}
+              onChange={handleChange}
+              required
+            />
+            {isSignup && (
+              <input
+                className="w-full px-3 py-2 font-semibold tracking-wide text-pale bg-primary rounded-md border border-secondary focus:border-light hover:border-accent placeholder:text-themColor-yellow"
+                placeholder="Confirm Password"
+                type="password"
+                name="confirmPassword"
+                value={formData.confirmPassword}
+                onChange={handleChange}
+                required
+              />
+            )}
+          </div>
+
+          {isSignup && (
+            <>
+              <select
+                className="w-full px-3 py-2 font-semibold tracking-wide text-pale bg-primary rounded-md border border-secondary focus:border-light hover:border-accent"
+                name="gender"
+                value={formData.gender}
+                onChange={handleChange}
+                required
+              >
+                <option value="">Select Gender</option>
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+                <option value="other">Other</option>
+              </select>
+            </>
+          )}
+
+          <div className="flex justify-between w-full items-center">
+            <label className="flex items-center text-sm">
+              <input
+                type="checkbox"
+                name="remember"
+                checked={formData.remember}
+                onChange={handleChange}
+                className="mr-2 w-4 h-4"
+              />
+              Remember me
+            </label>
+            {!isSignup && (
+              <a
+                href="/forget"
+                className="text-light font-medium hover:underline"
+              >
+                Forgot Password?
+              </a>
+            )}
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className={`w-full p-3 ${
+              loading ? "bg-themColor-red" : "bg-themColor-green text-white"
+            } rounded-full font-bold border-[4px] border-light ${
+              loading ? "cursor-not-allowed" : "hover:border-themColor-red"
+            } transition-all duration-300`}
+          >
+            {loading
+              ? isSignup
+                ? "Signing Up..."
+                : "Signing In..."
+              : isSignup
+              ? "Sign Up"
+              : "Sign In"}
+          </button>
+
+          <p className="text-sm">
+            {isSignup ? "Already have an account?" : "Don't have an account?"}
+            <button
+              type="button"
+              onClick={() => setIsSignup(!isSignup)}
+              className="font-semibold text-light hover:text-accent transition-all duration-200"
+            >
+              {isSignup ? "Sign in" : "Sign up"}
+            </button>
+          </p>
+        </form>
       </div>
     </div>
   );

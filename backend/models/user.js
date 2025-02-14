@@ -1,4 +1,3 @@
-const { json } = require("express");
 const mongoose = require("mongoose");
 const Schema = mongoose.Schema;
 
@@ -22,6 +21,7 @@ const userSchema = new Schema(
     }, // Default level
     score: { type: Number, default: 0, min: 0, max: 100 }, // Default score is 0
     points: { type: Number, default: 0},
+    avatar: {type: String, default: "https://avatar.iran.liara.run/public"},
     totalSkipped: { type: Number, default: 0 }, // Default skipped questions count
     totalHintsUsed: { type: Number, default: 0 }, // Total hints used by the user
     currentRemainingHints: { type: Number, default: 3 }, // Total remaining hints (default 5, can be adjusted)

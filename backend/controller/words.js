@@ -29,21 +29,27 @@ exports.getWords = async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
-    let level;
-    if (user.questionsSolved.easy <= 15) {
-      level = 1
-    } else if(user.questionsSolved.easy <= 25){
-      level = 2
-    } else if(user.questionsSolved.medium <= 7){
-      level = 3
-    }else if(user.questionsSolved.medium <= 20){
-      level = 4
-    }else if(user.questionsSolved.hard <= 10){
-      level = 5
-    }else if(user.questionsSolved.hard <=25){
-      level = 6
+    if (
+      user.current &&
+      Object.keys(user.current).length > 0 &&
+      !user.current.isSolved
+    ) {
+      return res.status(200).json(user.current);
     }
-    else {
+    let level;
+    if (user.questionsSolved.easy <= 10) {
+      level = 1;
+    } else if (user.questionsSolved.easy <= 20) {
+      level = 2;
+    } else if (user.questionsSolved.medium <= 7) {
+      level = 3;
+    } else if (user.questionsSolved.medium <= 20) {
+      level = 4;
+    } else if (user.questionsSolved.hard <= 10) {
+      level = 5;
+    } else if (user.questionsSolved.hard <= 25) {
+      level = 6;
+    } else {
       // random between level 1-6
       level = Math.floor(Math.random() * 6) + 1;
     }
@@ -94,7 +100,7 @@ exports.checkWord = async (req, res) => {
       return res.status(404).json({ message: "Word not found" });
     }
     if (word.word.toLocaleLowerCase() === guessWord.toLocaleLowerCase()) {
-      user = ScoreUpdate.scoreUpdate(user, word, true , time);
+      user = ScoreUpdate.scoreUpdate(user, word, true, time);
       await user.save();
       res.status(200).json({
         status: true,

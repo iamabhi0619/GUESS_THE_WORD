@@ -1,30 +1,82 @@
+const { default: axios } = require("axios");
 const User = require("../models/user");
-const { v4: uuidv4 } = require('uuid');
+const jwt = require("jsonwebtoken");
+const user = require("../models/user");
 
-exports.createUser = async (req, res) => {
+const serviceId = "S0001";
+const serviceName = "GUESS THE WORD";
+
+exports.loginUser = async (req, res) => {
   try {
-    const { name } = req.body;
-    const userId = uuidv4();
-    if (!name) {
-      return res.status(400).json({ message: "userId and name are required" });
+    const { email, password } = req.body;
+    // const userId = uuidv4();
+    const response = await axios.post(`${process.env.API_URL}/api/user/login`, {
+      email,
+      password,
+      serviceId,
+      serviceName,
+    });
+    if (!response.data.success) {
+      console.log("i am not here");
+      
+      return res.json(response.data);
     }
-    const existingUser = await User.findOne({ userId });
+    const { token } = response.data;
+    const decoded = jwt.verify(token, process.env.SECRET);
+    const userData = await axios.get(
+      `${process.env.API_URL}/api/user/profile`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
+    if (!userData.data.isVerified) {
+      return res.json({
+        success: false,
+        message: "Please verify Your Email..!!",
+      });
+    }
+    const existingUser = await User.findOne({ userId: decoded.userId });
     if (existingUser) {
       return res
-        .status(400)
-        .json({ message: "User with this userId already exists" });
+        .status(200)
+        .json({success:true, message: "User LogedIn successfully", user: existingUser });
     }
-    const newUser = new User({ userId, name });
+    const newUser = new User({
+      userId: userData.data.userId,
+      name: userData.data.name,
+      avatar: userData.data.avatar,
+    });
     await newUser.save();
-
-    res
-      .status(201)
-      .json({ message: "User created successfully", user: newUser });
+    res.status(201).json({
+      success: true,
+      message: "User LogedIn successfully",
+      user: newUser,
+    });
   } catch (error) {
-    console.log(error);
-    res
-      .status(500)
-      .json({ message: "Error creating user", error: error.message });
+    res.status(500).json(error.response.data);
+  }
+};
+
+exports.createuser = async (req, res) => {
+  try {
+    const { userId, name, email, password, gender } = req.body;
+    if (!name || !email || !password || !gender) {
+      return res.status(400).json({ error: "All fields are required" });
+    }
+    const user = await User.findOne({ userId });
+    if (user) {
+      res.status(200).json({ message: "Your are alrady an User...!!" });
+    }
+    const response = await axios.post(
+      `${process.env.API_URL}/api/user/register`,
+      { name, email, password, gender, serviceId, serviceName }
+    );
+    console.log(response.data);
+    if (response.data.success) {
+      res.status(201).json(response.data);
+    }
+  } catch (error) {
+    res.json(error.response.data);
   }
 };
 
@@ -72,7 +124,7 @@ exports.getScore = async (req, res) => {
       score: user.score,
       points: user.points,
       questionsSolved: user.questionsSolved,
-      currentRemainingHints: user.currentRemainingHints
+      currentRemainingHints: user.currentRemainingHints,
     };
     return res.status(200).json({ ...score });
   } catch (error) {}
@@ -87,7 +139,5 @@ exports.getHistory = async (req, res) => {
     }
     const history = user.questions;
     return res.status(200).json({ message: history });
-  } catch (error) {
-    
-  }
-}
+  } catch (error) {}
+};
