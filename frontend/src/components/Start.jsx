@@ -1,9 +1,9 @@
 import axios from "axios";
-import React, { useEffect, useState } from "react";
+import React, { useContext, useState } from "react";
+import userContext from "../context/userContext";
 
-function Start({ user, word, score }) {
-
-
+function Start() {
+  const { setToken} = useContext(userContext);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -26,55 +26,30 @@ function Start({ user, word, score }) {
       [name]: type === "checkbox" ? checked : value,
     });
   };
-
-  useEffect(() => {
-    localStorage.clear();
-  }, []);
-
-  const fetchScore = async (user) => {
-    if (user && user.userId) {
-      try {
-        const response = await fetch(`/api/user/${user.userId}/score`);
-        const data = await response.json();
-        score(data);
-      } catch (error) {
-        console.error("Failed to fetch score:", error);
-      }
-    }
-  };
-
-  const fetchWord = async (user) => {
-    if (user && user.userId) {
-      try {
-        const response = await fetch(`/api/word/${user.userId}`);
-        const data = await response.json();
-        word(data);
-        localStorage.setItem("word", JSON.stringify(data));
-      } catch (error) {
-        console.error("Failed to fetch word:", error);
-      }
-    }
-  };
-
   const handleLogin = async () => {
     try {
-      const response = await axios.post("/api/user/login", formData)
-      if(!response.data.success){
-        setError(response.data.message)
+      const response = await axios.post(
+        `${process.env.REACT_APP_API_BASE_URL}/api/user/login`,
+        formData
+      );
+      if (!response.data.success) {
+        setError(response.data.message);
         return;
       }
-      fetchScore(response.data.user);
-      fetchWord(response.data.user);
-      localStorage.setItem("user", JSON.stringify(response.data.user));
-      user(response.data.user);
+      localStorage.setItem("user", response.data.token);
+      setToken(response.data.token);
     } catch (error) {
-      setError(error.response?.data?.message || "There was a problem with the request");
+      setError(
+        error.response?.data?.message || "There was a problem with the request"
+      );
     }
   };
-
   const handleSingup = async () => {
     try {
-      const response = await axios.post("/api/user/signup", formData);
+      const response = await axios.post(
+        `${process.env.REACT_APP_API_BASE_URL}/api/user/register`,
+        formData
+      );
       // if (response.status !== 200) throw new Error("Signup request failed");
       if (response.data.success) {
         setMessage(`Verification email sent to ${formData.email}`);
@@ -90,7 +65,6 @@ function Start({ user, word, score }) {
       );
     }
   };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -107,7 +81,6 @@ function Start({ user, word, score }) {
       setLoading(false);
     }
   };
-
   return (
     <div className="w-full flex items-center justify-center h-full font-normal text-themColor-blue">
       <div className="bg-themColor-lightOrange border-[4px] border-themColor-blue rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:border-themColor-red max-w-lg w-full">
@@ -115,7 +88,10 @@ function Start({ user, word, score }) {
           onSubmit={handleSubmit}
           className="flex flex-col items-center space-y-2 py-12 px-10"
         >
-          <img src="/gtw_logo.png" alt="GTW Logo" className="h-24 w-24" />
+          <div className="bg-white rounded-full h-32 w-32 flex items-center justify-center">
+            <img src="/logo.svg" alt="GTW Logo" className="h-24 w-24 " />
+          </div>
+
           <h1 className="text-3xl text-light">
             {isSignup ? "Sign Up" : "Sign In"} to Guess The Word
           </h1>

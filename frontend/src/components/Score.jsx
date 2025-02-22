@@ -1,14 +1,18 @@
-import React from "react";
+import React, { useContext } from "react";
 import { FaStar, FaRegStar } from "react-icons/fa";
 import { FaHeart, FaHeartBroken } from "react-icons/fa";
+import userContext from "../context/userContext";
 
-function Score({ score }) {
+function Score() {
+
+  const {user} = useContext(userContext);
   // const acc = score?.score || 0;
-  const points = score?.points || 0;
-  const hints = score?.currentRemainingHints || 0;
-  const easy = score?.questionsSolved?.easy || 0;
-  const medium = score?.questionsSolved?.medium || 0;
-  const hard = score?.questionsSolved?.hard || 0;
+  
+  const points = user?.points || 0;
+  const hints = user?.hints.hintsLeft || 0;
+  const easy = user?.questionsSolved?.easy || 0;
+  const medium = user?.questionsSolved?.medium || 0;
+  const hard = user?.questionsSolved?.hard || 0;
 
   return (
     <>

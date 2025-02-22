@@ -1,37 +1,26 @@
-import React, { useState, useEffect } from "react";
-import NextButttom from "./NextButttom";
-import HintButtom from "./HintButtom";
+import React, { useContext, useState } from "react";
+import userContext from "../context/userContext";
 import Timer from "./Timer";
 import HistoryIcon from "./HistoryIcon";
+import HintButtom from "./HintButtom";
+import axios from "axios";
+import NextButttom from "./NextButttom";
 
-function GameSection({ user, word, setWord, setScore, history }) {
+const GameSection = ({ history }) => {
+  const {
+    user,
+    word,
+    token,
+    setWord,
+    setIsPaused,
+    fetchWord,
+    message,
+    setMessage,
+    elapsedTime,
+    fetchUser,
+  } = useContext(userContext);
+  const [hint, setHint] = useState("");
   const [userGuess, setUserGuess] = useState("");
-  const [message, setMessage] = useState("");
-  const [elapsedTime, setElapsedTime] = useState(0);
-  const [timer, setTimer] = useState(null);
-  useEffect(() => {
-    const storedTime = localStorage.getItem("time");
-    if (storedTime) {
-      setElapsedTime(parseInt(storedTime, 10));
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!word.solved) {
-      if (timer) {
-        clearInterval(timer);
-      }
-      const newTimer = setInterval(() => {
-        setElapsedTime((prevTime) => {
-          const updatedTime = prevTime + 1;
-          localStorage.setItem("time", updatedTime);
-          return updatedTime;
-        });
-      }, 1000);
-      setTimer(newTimer);
-      return () => clearInterval(newTimer);
-    }
-  }, [word]);
 
   const formatTime = (seconds) => {
     const minutes = Math.floor(seconds / 60);
@@ -41,74 +30,59 @@ function GameSection({ user, word, setWord, setScore, history }) {
     }${secs}`;
   };
 
-  const handleNextWord = async (e) => {
-    e.preventDefault();
+  const takeHint = async () => {
     try {
-      if (user && user.userId) {
-        try {
-          const response = await fetch(`/api/word/${user.userId}`);
-          const data = await response.json();
-          setWord(data);
-          setElapsedTime(0);
-          localStorage.setItem("word", JSON.stringify(data));
-          setMessage("");
-        } catch (error) {
-          console.error("Failed to fetch word:", error);
+      const response = await axios.get(
+        `${process.env.REACT_APP_API_BASE_URL}/api/gtw/hint`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         }
+      );
+      if (response.data.success) {
+        setHint(response.data.hint);
+      }else{
+        setHint(response.data.message);
       }
     } catch (error) {
-      console.error("Error fetching the next word:", error);
-      setMessage(
-        "There was an error fetching the next word. Please try again."
-      );
+      setHint(error.response.data.message);
+      console.error("Error fetching hint:", error);
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch(`/api/word/${user.userId}/check`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          guessWord: userGuess,
+      const response = await axios.post(
+        `${process.env.REACT_APP_API_BASE_URL}/api/gtw/check`,
+        {
+          guess: userGuess,
           time: formatTime(elapsedTime),
-        }),
-      });
-      const contentType = response.headers.get("Content-Type");
-      if (contentType && contentType.includes("application/json")) {
-        const data = await response.json();
-        console.log(data);
-        if (data.status) {
-          setWord(data.word);
-          setUserGuess("");
-          setScore(data.score);
-          setMessage(data.message);
-        } else {
-          setMessage(data.message);
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
         }
+      );
+
+      if (response.data.success) {
+        setUserGuess("");
+        setWord(response.data.word);
+        setMessage(response.data.message);
+        // setIsPaused(true);
+        fetchUser();
       } else {
-        const text = await response.text();
-        console.error("Unexpected response format:", text);
-        setMessage("Unexpected response format. Please try again.");
+        setMessage(response.data.message);
       }
     } catch (error) {
-      console.error("Error checking the word:", error);
-      setMessage("There was an error checking your guess. Please try again.");
+      console.error("Error checking the word:", error.response.data);
+      setMessage(error.response.data.message);
     }
   };
 
-  const takeHint = async () => {
-    try {
-      const response = await fetch(`/api/word/${user.userId}/hint`);
-      const data = await response.json();
-      console.log(data);
-      setWord(data.word);
-      setScore(data.score);
-    } catch (error) {}
-  };
   return (
     <div className="md:bg-white mx-2 my-2 p-5 w-full rounded-3xl font-normal flex flex-col justify-between items-center grow">
       <div className="flex justify-between w-full items-center">
@@ -119,25 +93,27 @@ function GameSection({ user, word, setWord, setScore, history }) {
           </span>
         </p>
         <div className="flex flex-col gap-1 mg:gap-2 items-center">
-          {!word.isSolved && <Timer time={formatTime(elapsedTime)} />}
+          {!word?.isSolved && <Timer time={formatTime(elapsedTime)} />}
           <HistoryIcon onClick={history} />
         </div>
       </div>
-      {!word.isHint && !word.isSolved ? (
+      {!hint ? (
         <HintButtom onClick={takeHint} />
       ) : (
-        <p className="text-2xl md:text-3xl text-themColor-red text-center">{word.hint}</p>
+        <p className="text-2xl md:text-3xl text-themColor-red text-center">
+          {hint}
+        </p>
       )}
       <div className="flex flex-col items-center justify-center text-center md:mt-2">
         <p className=" md:text-3xl text-4xl">
-          {word.solved ? "Guessed Word" : "Guessing Word"}
+          {word?.isSolved ? "Guessed Word" : "Guessing Word"}
         </p>
         <p className="w-fit bg-themColor-red text-white rounded-full md:py-1 tracking-widest mx-4 md:text-6xl text-5xl my-1 px-10">
-          {word?.originalWord || word?.scrambleWords || "Loading..."}
+          {word?.originalWord || word?.scrambledWord || "Loading..."}
         </p>
       </div>
       <div className="flex items-center justify-center">
-        {!word.isSolved && (
+        {!word?.isSolved && (
           <form
             onSubmit={handleSubmit}
             className="flex flex-col lg:flex-row items-center mt-1 gap-2 md:gap-4"
@@ -173,20 +149,18 @@ function GameSection({ user, word, setWord, setScore, history }) {
       <p className="text-center md:text-5xl text-4xl text-themColor-green tracking-wider mt-4">
         {message}
       </p>
-      <form>
-        {word.isSolved && (
-          <div className="flex flex-col justify-center items-center my-5 gap-3">
-            <p className="text-themColor-blue md:text-3xl text-2xl text-center">
-              {word.meaning}
-            </p>
-            <button onClick={handleNextWord}>
-              <NextButttom />
-            </button>
-          </div>
-        )}
-      </form>
+      {word?.isSolved && (
+        <div className="flex flex-col justify-center items-center my-5 gap-3">
+          <p className="text-themColor-blue md:text-3xl text-2xl text-center">
+            {word.meaning}
+          </p>
+          <button onClick={fetchWord}>
+            <NextButttom />
+          </button>
+        </div>
+      )}
     </div>
   );
-}
+};
 
 export default GameSection;

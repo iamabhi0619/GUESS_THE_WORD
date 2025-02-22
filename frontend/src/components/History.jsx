@@ -1,24 +1,27 @@
+import axios from "axios";
 import React, { useEffect, useState } from "react";
+import { useContext } from "react";
+import userContext from "../context/userContext";
 
 const History = ({ user, history }) => {
   const [guesses, setGuesses] = useState([]);
+  const { token } = useContext(userContext);
 
   useEffect(() => {
     const fetchHistory = async () => {
       try {
-        const response = await fetch(`/api/user/${user.userId}/history`);
-        if (!response.ok) {
-          throw new Error("Network response was not ok");
-        }
-        const data = await response.json();
-        setGuesses(data.message);
+        const response = await axios.get(`${process.env.REACT_APP_API_BASE_URL}/api/gtw/history`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        setGuesses(response.data.history);
       } catch (error) {
         console.error("Failed to fetch game history:", error);
       }
     };
-
     fetchHistory();
-  }, [user.userId]);
+  }, [token]);
 
   return (
     <div className="md:bg-white mx-2 my-2 p-5 w-full rounded-3xl font-normal flex flex-col items-center">
@@ -48,20 +51,20 @@ const History = ({ user, history }) => {
               } w-full px-4 py-1 rounded-xl mb-2 text-lg md:text-xl`}
             >
               <div>
-                <p>Word: {guess.scrambleWords}</p>
-                <p>Guessed: {guess.originalWord}</p>
+                <p>Word: {guess.scrambledWord}</p>
+                <p>Guessed: {guess.correctWord}</p>
               </div>
               <div className="flex flex-col md:flex-row items-center justify-between md:w-[40vh]">
                 <div>
-                  <p
+                  {/* <p
                     className={`${
                       guess.point > 0
                         ? "text-themColor-green"
                         : "text-themColor-red"
                     }`}
                   >
-                    {guess.point?`+ ${guess.point}`:"No Points"}
-                  </p>
+                    {guess.point ? `+ ${guess.point}` : "No Points"}
+                  </p> */}
                 </div>
                 <div className="flex flex-col text-end">
                   <p>Time taken: {guess.time}</p>
